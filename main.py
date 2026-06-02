@@ -142,7 +142,7 @@ def emlakjet_tara(browser, url):
 # SAHİBİNDEN (nodriver ile - ücretsiz)
 # ─────────────────────────────────────────
 async def sahibinden_async_tara(url):
-    browser = await uc.start(headless=True, no_sandbox=True)
+    browser = await uc.start(headless=True, browser_args=["--no-sandbox", "--disable-setuid-sandbox"])
     try:
         page = await browser.get(url)
         await asyncio.sleep(6)          # Cloudflare challenge için bekle
