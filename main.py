@@ -4,7 +4,7 @@ import random
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-from playwright_stealth import Stealth
+from playwright_stealth import stealth_sync
 
 # --- KULLANICI AYARLARI ---
 TELEGRAM_TOKEN = "8752514015:AAH1iWVgJnnpwQQun_fQ0CFDHyL0yDCDAT8"
