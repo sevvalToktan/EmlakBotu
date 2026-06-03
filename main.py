@@ -30,16 +30,13 @@ if not os.path.exists(HAFIZA_DOSYASI):
 with open(HAFIZA_DOSYASI, "r") as f:
     gorulen_ilanlar = set(f.read().splitlines())
 
-# Eğer hafıza dosyası ilk defa oluşuyorsa sessiz modda çalış (eski ilanları bota yığma)
 ILK_TARAMA_MI = len(gorulen_ilanlar) == 0
 
 def telegram_mesaj_gonder(mesaj):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": mesaj, "parse_mode": "Markdown"}
-    try: 
-        requests.post(url, json=payload)
-    except: 
-        pass
+    try: requests.post(url, json=payload)
+    except: pass
 
 def sayfayi_guvenli_getir(browser, url):
     context = browser.new_context(
@@ -47,11 +44,15 @@ def sayfayi_guvenli_getir(browser, url):
         viewport={"width": 1920, "height": 1080}
     )
     page = context.new_page()
+    
+    # EN KRİTİK DÜZELTME: Sayfaya askeri düzeyde gizlilik maskesi takıyoruz
+    stealth_sync(page)
+    
     try:
         page.goto(url, wait_until="domcontentloaded", timeout=30000)
-        time.sleep(random.uniform(4, 7))
-        page.evaluate("window.scrollBy(0, 500);")
-        time.sleep(random.uniform(2, 4))
+        time.sleep(random.uniform(5, 8))
+        page.evaluate("window.scrollBy(0, 600);")
+        time.sleep(random.uniform(3, 5))
         html = page.content()
         context.close()
         return html
@@ -63,23 +64,25 @@ def hepsiemlak_tara(browser, url):
     html = sayfayi_guvenli_getir(browser, url)
     if not html: return
     soup = BeautifulSoup(html, 'html.parser')
-    ilanlar = soup.find_all('li', class_='listing-item') 
     
-    for ilan in ilanlar:
-        link_el = ilan.find('a')
-        if not link_el or not link_el.has_attr('href'): continue
+    # Sınıf isimlerini tamamen boş verip sayfadaki tüm linkleri tarıyoruz
+    tum_linkler = soup.find_all('a', href=True)
+    
+    for a in tum_linkler:
+        href = a['href']
+        ilan_id_adayi = href.split('/')[-1]
         
-        link = "https://www.hepsiemlak.com" + link_el['href']
-        ilan_id = link.split('-')[-1]
-        if not ilan_id.isdigit(): continue 
-        
-        if ilan_id not in gorulen_ilanlar:
-            gorulen_ilanlar.add(ilan_id)
-            with open(HAFIZA_DOSYASI, "a") as f:
-                f.write(ilan_id + "\n")
-            if not ILK_TARAMA_MI:
-                title = link_el.get('title', 'Hepsiemlak İlanı')
-                telegram_mesaj_gonder(f"❤️ **[Hepsiemlak] Yeni İlan!**\n\n🏠 {title}\n🔗 [İlanı İncele]({link})")
+        if "-" in ilan_id_adayi:
+            parcalar = ilan_id_adayi.split('-')
+            # Eğer linkin sonu iki grup rakamla bitiyorsa bu kesin ilandır (Örn: 148965-134)
+            if len(parcalar) >= 2 and parcalar[-1].isdigit() and parcalar[-2].isdigit():
+                if ilan_id_adayi not in gorulen_ilanlar:
+                    gorulen_ilanlar.add(ilan_id_adayi)
+                    with open(HAFIZA_DOSYASI, "a") as f:
+                        f.write(ilan_id_adayi + "\n")
+                    if not ILK_TARAMA_MI:
+                        link = "https://www.hepsiemlak.com" + href if href.startswith('/') else href
+                        telegram_mesaj_gonder(f"❤️ **[Hepsiemlak] Yeni İlan!**\n\n🔗 [İlanı İncele]({link})")
 
 def emlakjet_tara(browser, url):
     html = sayfayi_guvenli_getir(browser, url)
@@ -99,11 +102,10 @@ def emlakjet_tara(browser, url):
                     f.write(ilan_id + "\n")
                 if not ILK_TARAMA_MI:
                     link = "https://www.emlakjet.com" + href
-                    telegram_mesaj_gonder(f"💚 **[Emlakjet] Yeni İlan!**\n\n🏠 Kriterlerinize Uygun Yeni İlan Düştü\n🔗 [İlanı İncele]({link})")
+                    telegram_mesaj_gonder(f"💚 **[Emlakjet] Yeni İlan!**\n\n🔗 [İlanı İncele]({link})")
 
 def main():
-    stealth = Stealth()
-    with stealth.use_sync(sync_playwright()) as p:
+    with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         for url in HEPSIEMLAK_URLLER:
             hepsiemlak_tara(browser, url)
